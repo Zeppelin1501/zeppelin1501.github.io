@@ -60,10 +60,45 @@ function categoryTone(cat) {
   }[cat] || { bg:'#0b1020', fc:'#9b5ff5' };
 }
 
+function syncProjectGridReady(grid) {
+  if (!grid) return;
+  grid.classList.add('in');
+  grid.style.opacity = '1';
+  grid.style.transform = 'translateY(0)';
+}
+
+function hydrateProjectCards(grid) {
+  if (!grid) return;
+  var cards = grid.querySelectorAll('.pc');
+  cards.forEach(function(card, index) {
+    var project = PROJECTS_DATA[index];
+    if (!project) return;
+
+    var actionsEl = card.querySelector('.pc-actions');
+    if (!actionsEl) {
+      actionsEl = document.createElement('div');
+      actionsEl.className = 'pc-actions';
+      card.querySelector('.pc-body').appendChild(actionsEl);
+    }
+
+    if (!actionsEl.children.length) {
+      project.links.forEach(function(link, linkIndex) {
+        var action = document.createElement('a');
+        action.href = link;
+        action.target = '_blank';
+        action.rel = 'noopener';
+        action.className = 'pc-link-btn';
+        action.textContent = project.links.length > 1 ? 'Watch Reel ' + (linkIndex + 1) : 'Watch Reel';
+        actionsEl.appendChild(action);
+      });
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   var grid = document.getElementById('projGrid');
-  if (grid) {
-    PROJECTS_DATA.forEach(function(project) {
+  if (grid && !grid.children.length) {
+    PROJECTS_DATA.forEach(function(project, projectIndex) {
       var tone = categoryTone(project.cat);
       var firstLink = project.links[0];
       var videoId = extractVideoId(firstLink);
@@ -78,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
         '<article class="pc" data-cat="' + project.cat + '">',
         '  <div class="pc-thumb" style="background:' + tone.bg + ';">',
         thumb
-          ? '    <img src="' + thumb + '" alt="' + project.n + '" loading="lazy">'
+          ? '    <img src="' + thumb + '" alt="' + project.n + '" loading="' + (projectIndex < 6 ? 'eager' : 'lazy') + '"' + (projectIndex < 3 ? ' fetchpriority="high"' : '') + '>'
           : '    <div style="width:100%;height:100%;background:' + tone.bg + ';"></div>',
         '  </div>',
         '  <div class="pc-body">',
@@ -90,6 +125,16 @@ document.addEventListener('DOMContentLoaded', function() {
         '</article>'
       ].join(''));
     });
+
+    syncProjectGridReady(grid);
+    requestAnimationFrame(function() {
+      hydrateProjectCards(grid);
+      syncProjectGridReady(grid);
+      if (window.resizeSceneBases) window.resizeSceneBases();
+    });
+  } else if (grid) {
+    hydrateProjectCards(grid);
+    syncProjectGridReady(grid);
   }
 
   document.querySelectorAll('.flt-btn').forEach(function(btn) {
@@ -107,6 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.querySelectorAll('.pc').forEach(function(card) {
         card.classList.toggle('hidden', key !== 'all' && card.dataset.cat !== key);
       });
+      syncProjectGridReady(grid);
       if (window.addScore) addScore(15);
     });
   });

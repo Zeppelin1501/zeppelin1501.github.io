@@ -52,9 +52,18 @@
     return min + Math.random() * (max - min);
   }
 
+  function setOverlayBody(text) {
+    if (!arcade.overlayText) return;
+    arcade.overlayText.innerHTML = '';
+    String(text).split('\n').forEach(function(line, index, arr) {
+      arcade.overlayText.appendChild(document.createTextNode(line));
+      if (index < arr.length - 1) arcade.overlayText.appendChild(document.createElement('br'));
+    });
+  }
+
   function showOverlay(title, text) {
     if (arcade.overlayTitle) arcade.overlayTitle.textContent = title;
-    if (arcade.overlayText) arcade.overlayText.textContent = text;
+    setOverlayBody(text);
     if (arcade.overlay) arcade.overlay.classList.remove('hidden');
   }
 
@@ -256,6 +265,33 @@
     var rect = arcade.canvas.getBoundingClientRect();
     arcade.pointer.x = clamp(event.clientX - rect.left, 0, arcade.width);
     arcade.pointer.y = clamp(event.clientY - rect.top, 0, arcade.height);
+  }
+
+  function overlayIntroText() {
+    if (arcade.width <= 460) {
+      return 'Collect green cores.\nAvoid red shards.\nPulse at 100%.';
+    }
+    return 'Pilot the signal craft through a collapsing data lane. Collect green cores, avoid red shards, and fire a pulse with Space when the meter reaches 100%.';
+  }
+
+  function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+    var words = text.split(/\s+/);
+    var line = '';
+    var currentY = y;
+
+    words.forEach(function(word) {
+      var next = line ? line + ' ' + word : word;
+      if (ctx.measureText(next).width > maxWidth && line) {
+        ctx.fillText(line, x, currentY);
+        line = word;
+        currentY += lineHeight;
+      } else {
+        line = next;
+      }
+    });
+
+    if (line) ctx.fillText(line, x, currentY);
+    return currentY;
   }
 
   function handleInput(dt) {
@@ -524,14 +560,27 @@
   }
 
   function drawUiHints() {
+    if (arcade.state !== 'running') return;
     var ctx = arcade.ctx;
+    var baseFont = arcade.width <= 420 ? 9 : arcade.width <= 620 ? 10 : 12;
+    var inset = arcade.width <= 420 ? 12 : 18;
+    var maxWidth = arcade.width - inset * 2;
     ctx.save();
-    ctx.font = '12px "Share Tech Mono", monospace';
+    ctx.font = baseFont + 'px "Share Tech Mono", monospace';
     ctx.fillStyle = 'rgba(215,205,239,0.75)';
-    ctx.fillText('Collect green cores. Shield pickups are cyan. Pulse with SPACE at 100%.', 18, arcade.height - 18);
+    drawWrappedText(
+      ctx,
+      arcade.width <= 420
+        ? 'Green cores charge pulse. Cyan shields you. Pulse at 100%.'
+        : 'Collect green cores. Shield pickups are cyan. Pulse with SPACE at 100%.',
+      inset,
+      arcade.height - (arcade.width <= 420 ? 32 : 18),
+      maxWidth,
+      baseFont + 4
+    );
     if (arcade.combo > 1) {
       ctx.fillStyle = 'rgba(255,215,0,0.92)';
-      ctx.fillText('COMBO x' + arcade.combo, 18, 26);
+      ctx.fillText('COMBO x' + arcade.combo, inset, arcade.width <= 420 ? 22 : 26);
     }
     ctx.restore();
   }
@@ -574,7 +623,7 @@
     resizeCanvas();
     resetRun();
     updateButtons();
-    showOverlay('Neon Rift Runner', 'Pilot the signal craft through a collapsing data lane. Collect green cores, avoid red shards, and fire a pulse with Space when the meter reaches 100%.');
+    showOverlay('Neon Rift Runner', overlayIntroText());
 
     arcade.startBtn.addEventListener('click', function() {
       if (arcade.state === 'idle' || arcade.state === 'gameover') startRun();
@@ -597,6 +646,10 @@
     });
 
     arcade.canvas.addEventListener('pointerup', function() {
+      arcade.pointer.active = false;
+    });
+
+    arcade.canvas.addEventListener('pointercancel', function() {
       arcade.pointer.active = false;
     });
 
@@ -629,6 +682,12 @@
 
     window.addEventListener('resize', function() {
       resizeCanvas();
+      if (arcade.state !== 'running') {
+        showOverlay(
+          arcade.overlayTitle ? arcade.overlayTitle.textContent : 'Neon Rift Runner',
+          arcade.overlayText && arcade.overlayText.textContent ? arcade.overlayText.textContent : overlayIntroText()
+        );
+      }
     });
 
     if (window.ResizeObserver) {
